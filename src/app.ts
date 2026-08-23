@@ -1,41 +1,134 @@
+import "dotenv/config";
+
 import TelnetService from "./services/telnetService";
-import dotenv from "dotenv";
 
-// Load environment variables from .env file
-dotenv.config();
-const host = process.env.TELNET_HOST || "localhost";
-const port = parseInt(process.env.TELNET_PORT || "23", 10);
+function getRequiredEnvironmentVariable(
+	name: string,
+): string {
+	const value = process.env[name]?.trim();
 
-const username = process.env.TELNET_USERNAME || "username";
-const password = process.env.TELNET_PASSWORD || "password";
+	if (!value) {
+		throw new Error(
+			`Environment variable ${name} is required.`,
+		);
+	}
 
-async function main() {
-    let telnetService: TelnetService | null = null;
-    try {
-        // Create an instance of TelnetService with the appropriate host and port
-        telnetService = new TelnetService(host, port);
-
-        // Connect to the Telnet server
-        await telnetService.connect();
-        console.log("Connected to the Telnet server.");
-
-        // Authenticate with the Telnet server
-        await telnetService.authenticate(username, password);
-        console.log("Authenticated successfully.");
-
-        // Read data from the Telnet server
-        telnetService.readData();
-
-    } catch (error) {
-        console.error(error);
-        if (telnetService) {
-            telnetService.disconnect();
-        }
-        process.exit(1);
-    }
+	return value;
 }
 
-main().catch((error) => {
-    console.error("Unexpected error:", error);
-    process.exit(1);
+function getPort(): number {
+	const value =
+		process.env.TELNET_PORT?.trim() || "23";
+
+	const port = Number(value);
+
+	if (
+		!Number.isInteger(port) ||
+		port < 1 ||
+		port > 65_535
+	) {
+		throw new Error(
+			"TELNET_PORT must be an integer between 1 and 65535.",
+		);
+	}
+
+	return port;
+}
+
+function getSecret(): number {
+	const value =
+		getRequiredEnvironmentVariable(
+			"TELNET_SECRET",
+		);
+
+	const secret = Number(value);
+
+	if (!Number.isFinite(secret)) {
+		throw new Error(
+			"TELNET_SECRET must be a valid number.",
+		);
+	}
+
+	return secret;
+}
+
+let telnetService: TelnetService | null = null;
+
+async function main(): Promise<void> {
+	const host =
+		getRequiredEnvironmentVariable(
+			"TELNET_HOST",
+		);
+
+	const port = getPort();
+
+	const username =
+		getRequiredEnvironmentVariable(
+			"TELNET_USERNAME",
+		);
+
+	const secret = getSecret();
+
+	telnetService = new TelnetService(
+		host,
+		port,
+	);
+
+	await telnetService.connect();
+
+	console.log(
+		"Connected to the Telnet server.",
+	);
+
+	await telnetService.authenticate(
+		username,
+		secret,
+	);
+
+	console.log(
+		"Authenticated successfully.",
+	);
+
+	telnetService.onPacket((packet) => {
+		/*
+		 * Handle packets received from the Telnet server here.
+		 *
+		 * Example:
+		 *
+		 * if (packet.Action === "status") {
+		 *     // Handle status packet.
+		 * }
+		 */
+		console.log(
+			"Received packet:",
+			packet,
+		);
+	});
+}
+
+function shutdown(signal: string): void {
+	console.log(
+		`Received ${signal}. Shutting down...`,
+	);
+
+	telnetService?.disconnect();
+}
+
+process.once("SIGINT", () => {
+	shutdown("SIGINT");
+});
+
+process.once("SIGTERM", () => {
+	shutdown("SIGTERM");
+});
+
+void main().catch((error: unknown) => {
+	console.error(
+		"Telnet service failed:",
+		error,
+	);
+
+	telnetService?.disconnect();
+
+	process.exitCode = 1;
 });
