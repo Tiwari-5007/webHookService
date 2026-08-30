@@ -1,28 +1,19 @@
 import "dotenv/config";
 import TelnetService from "./services/telnetService";
+import { validateAndGetTelnetConfig } from "./config/";
 
 let telnetService: TelnetService | null = null;
 
 async function main(): Promise<void> {
+	const { host, port, username, secret } = validateAndGetTelnetConfig();
 
 	// Crate an instance of the TelnetService with the validated configuration.
-	const host = process.env.TELNET_HOST;
-	const port = Number(process.env.TELNET_PORT);
-	if (!host || !port) {
-		throw new Error("TELNET_HOST and TELNET_PORT must be set in the environment variables.");
-	}
 	telnetService = new TelnetService(host,port);
 
 	// Connect to the Telnet server.
 	await telnetService.connect();
 
 	// Authenticate with the Telnet server using the provided username and secret.
-	const username = process.env.TELNET_USERNAME;
-	let secret = Number(process.env.TELNET_SECRET);
-	if (!username || !secret) {
-		throw new Error("TELNET_USERNAME and TELNET_SECRET must be set in the environment variables.");
-	}
-
 	await telnetService.authenticate(username,secret);
 
 	// Set up a packet handler to process incoming packets from the Telnet server.
