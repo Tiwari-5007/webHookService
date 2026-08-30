@@ -2,8 +2,10 @@ import "dotenv/config";
 import TelnetService from "./services/telnetService";
 import { validateAndGetTelnetConfig } from "./config/";
 import { checkDatabaseConnection } from "./database/dbConnection";
+import RuleService from "./services/ruleService";
 
 let telnetService: TelnetService | null = null;
+let ruleService  : RuleService   | null = null;
 
 async function main(): Promise<void> {
 	
@@ -21,9 +23,15 @@ async function main(): Promise<void> {
 	// Authenticate with the Telnet server using the provided username and secret.
 	await telnetService.authenticate(username,secret);
 
+	ruleService = new RuleService();
+	await ruleService?.loadHashes();
+	const hashes = ruleService.getHashes("campaignMap");
+	console.dir(hashes, { depth: null });
+
 	// Set up a packet handler to process incoming packets from the Telnet server.
 	telnetService.onPacket((packet) => {
 		console.log("Received packet:",packet);
+		ruleService?.processEvents(packet);
 	});
 }
 
