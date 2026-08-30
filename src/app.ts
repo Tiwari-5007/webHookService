@@ -1,10 +1,15 @@
 import "dotenv/config";
 import TelnetService from "./services/telnetService";
 import { validateAndGetTelnetConfig } from "./config/";
+import { checkDatabaseConnection } from "./database/dbConnection";
 
 let telnetService: TelnetService | null = null;
 
 async function main(): Promise<void> {
+	
+	// Check the Database connection before starting the Telnet service.
+	await checkDatabaseConnection();
+
 	const { host, port, username, secret } = validateAndGetTelnetConfig();
 
 	// Crate an instance of the TelnetService with the validated configuration.
